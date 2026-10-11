@@ -1,0 +1,113 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}{% if pk %}Editar Lugar{% else %}Agregar Lugar{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <a href="{% url 'blog' %}" class="btn btn-sm btn-outline-secondary mb-3">
+      <i class="bi bi-arrow-left"></i> Volver al Blog
+    </a>
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h1 class="h5 mb-0">
+          <i class="bi bi-geo-alt-plus"></i> {% if pk %}Editar Lugar{% else %}Agregar Lugar{% endif %}
+        </h1>
+      </div>
+      <div class="card-body">
+        <div id="form-alertas"></div>
+        <form id="form-lugar" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label class="form-label" for="nombre">Nombre</label>
+            <input type="text" class="form-control" id="nombre" name="nombre" maxlength="150" required>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="pais">País</label>
+              <input type="text" class="form-control" id="pais" name="pais" maxlength="100" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="ciudad">Ciudad</label>
+              <input type="text" class="form-control" id="ciudad" name="ciudad" maxlength="100" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="descripcion">Descripción</label>
+            <textarea class="form-control" id="descripcion" name="descripcion" rows="4" required></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="foto">Foto (opcional)</label>
+            <input type="file" class="form-control" id="foto" name="foto" accept="image/*">
+            <div id="foto-actual" class="form-text d-none">
+              Foto actual: <img id="foto-actual-img" src="" alt="Foto actual"
+                                style="width:64px;height:64px;object-fit:cover;border-radius:6px;vertical-align:middle;">
+              <span class="ms-1">Sube un archivo para reemplazarla (déjalo vacío para mantenerla).</span>
+            </div>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              {% if pk %}Guardar cambios{% else %}Guardar{% endif %}
+            </button>
+            <a href="{% url 'lista_lugares' %}" class="btn btn-outline-secondary">Cancelar</a>
+            {% if pk %}
+            <a href="{% url 'eliminar_lugar' pk %}" class="btn btn-outline-danger ms-auto">
+              <i class="bi bi-trash"></i> Eliminar
+            </a>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const PK = '{{ pk|default:"" }}';
+  const ES_EDICION = Boolean(PK);
+
+  async function cargarLugar() {
+    try {
+      const respuesta = await apiFetch('/api/lugares/' + PK + '/');
+      const lugar = await obtenerDatos(respuesta);
+
+      document.getElementById('nombre').value = lugar.nombre || '';
+      document.getElementById('pais').value = lugar.pais || '';
+      document.getElementById('ciudad').value = lugar.ciudad || '';
+      document.getElementById('descripcion').value = lugar.descripcion || '';
+
+      if (lugar.foto) {
+        document.getElementById('foto-actual').classList.remove('d-none');
+        document.getElementById('foto-actual-img').src = lugar.foto;
+      }
+    } catch (error) {
+      mostrarAlerta('form-alertas', 'No fue posible cargar el lugar: ' + error.message, 'danger');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!requerirSesion()) return;
+    if (ES_EDICION) {
+      cargarLugar();
+    }
+  });
+
+  document.getElementById('form-lugar').addEventListener('submit', async function (evento) {
+    evento.preventDefault();
+    const datos = new FormData(this);
+    const url = ES_EDICION ? '/api/lugares/' + PK + '/' : '/api/lugares/';
+    const metodo = ES_EDICION ? 'PATCH' : 'POST';
+
+    try {
+      const respuesta = await apiFetch(url, { method: metodo, body: datos });
+      await obtenerDatos(respuesta);
+      mostrarAlerta('form-alertas', ES_EDICION ? 'Lugar actualizado correctamente.' : 'Lugar creado correctamente.', 'success');
+      setTimeout(function () { window.location.href = '/lugares/'; }, 900);
+    } catch (error) {
+      const mensajes = error.data ? erroresValidacion(error.data) : [error.message];
+      mostrarAlerta('form-alertas', mensajes.join('<br>'), 'danger');
+    }
+  });
+</script>
+{% endblock %}

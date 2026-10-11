@@ -1,0 +1,181 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}{% if pk %}Editar Viaje{% else %}Nuevo Viaje{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <a href="{% url 'blog' %}" class="btn btn-sm btn-outline-secondary mb-3">
+      <i class="bi bi-arrow-left"></i> Volver al Blog
+    </a>
+    <div class="card shadow-sm">
+      <div class="card-header bg-success text-white">
+        <h1 class="h5 mb-0">
+          <i class="bi bi-airplane"></i> {% if pk %}Editar Viaje{% else %}Nuevo Viaje{% endif %}
+        </h1>
+      </div>
+      <div class="card-body">
+        <div id="form-alertas"></div>
+        <form id="form-viaje" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label class="form-label" for="titulo">Título</label>
+            <input type="text" class="form-control" id="titulo" name="titulo" maxlength="200" required>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="persona">Persona</label>
+              <select class="form-select" id="persona" name="persona" required>
+                <option value="">Cargando personas…</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="lugar">Lugar</label>
+              <select class="form-select" id="lugar" name="lugar" required>
+                <option value="">Cargando lugares…</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="fecha_visita">Fecha de visita</label>
+              <input type="date" class="form-control" id="fecha_visita" name="fecha_visita" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="calificacion">Calificación</label>
+              <select class="form-select" id="calificacion" name="calificacion" required>
+                <option value="1">1 Estrellas</option>
+                <option value="2">2 Estrellas</option>
+                <option value="3" selected>3 Estrellas</option>
+                <option value="4">4 Estrellas</option>
+                <option value="5">5 Estrellas</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="relato">Relato</label>
+            <textarea class="form-control" id="relato" name="relato" rows="5" required></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="foto">Foto (opcional)</label>
+            <input type="file" class="form-control" id="foto" name="foto" accept="image/*">
+            <div id="foto-actual" class="form-text d-none">
+              Foto actual: <img id="foto-actual-img" src="" alt="Foto actual"
+                                style="width:64px;height:64px;object-fit:cover;border-radius:6px;vertical-align:middle;">
+              <span class="ms-1">Sube un archivo para reemplazarla (déjalo vacío para mantenerla).</span>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success">
+              {% if pk %}Guardar cambios{% else %}Publicar viaje{% endif %}
+            </button>
+            <a href="{% url 'blog' %}" class="btn btn-outline-secondary">Cancelar</a>
+            {% if pk %}
+            <a href="{% url 'eliminar_viaje' pk %}" class="btn btn-outline-danger ms-auto">
+              <i class="bi bi-trash"></i> Eliminar
+            </a>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const PK = '{{ pk|default:"" }}';
+  const ES_EDICION = Boolean(PK);
+
+  async function cargarOpciones() {
+    try {
+      const [personasRes, lugaresRes] = await Promise.all([
+        apiFetch('/api/personas/'),
+        apiFetch('/api/lugares/'),
+      ]);
+
+      const personas = await obtenerDatos(personasRes);
+      const lugares = await obtenerDatos(lugaresRes);
+
+      const selectPersona = document.getElementById('persona');
+      const selectLugar = document.getElementById('lugar');
+
+      selectPersona.innerHTML = '<option value="">Seleccione una persona…</option>';
+      personas.forEach(function (persona) {
+        const opcion = document.createElement('option');
+        opcion.value = persona.id;
+        opcion.textContent = persona.nombre + ' ' + persona.apellido + ' (' + persona.rut + ')';
+        selectPersona.appendChild(opcion);
+      });
+
+      selectLugar.innerHTML = '<option value="">Seleccione un lugar…</option>';
+      lugares.forEach(function (lugar) {
+        const opcion = document.createElement('option');
+        opcion.value = lugar.id;
+        opcion.textContent = lugar.nombre + ' (' + lugar.ciudad + ', ' + lugar.pais + ')';
+        selectLugar.appendChild(opcion);
+      });
+
+      if (!personas.length) {
+        mostrarAlerta('form-alertas', 'Primero debes registrar una persona.', 'warning');
+      }
+      if (!lugares.length) {
+        mostrarAlerta('form-alertas', 'Primero debes registrar un lugar.', 'warning');
+      }
+    } catch (error) {
+      mostrarAlerta('form-alertas', 'No fue posible cargar personas y lugares: ' + error.message, 'danger');
+    }
+  }
+
+  async function cargarViaje() {
+    try {
+      const respuesta = await apiFetch('/api/viajes/' + PK + '/');
+      const viaje = await obtenerDatos(respuesta);
+
+      document.getElementById('titulo').value = viaje.titulo || '';
+      document.getElementById('persona').value = viaje.persona;
+      document.getElementById('lugar').value = viaje.lugar;
+      document.getElementById('fecha_visita').value = viaje.fecha_visita || '';
+      document.getElementById('calificacion').value = viaje.calificacion;
+      document.getElementById('relato').value = viaje.relato || '';
+
+      if (viaje.foto) {
+        document.getElementById('foto-actual').classList.remove('d-none');
+        document.getElementById('foto-actual-img').src = viaje.foto;
+      }
+    } catch (error) {
+      mostrarAlerta('form-alertas', 'No fue posible cargar el viaje: ' + error.message, 'danger');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', async function () {
+    if (!requerirSesion()) return;
+    await cargarOpciones();
+    if (ES_EDICION) {
+      await cargarViaje();
+    }
+  });
+
+  document.getElementById('form-viaje').addEventListener('submit', async function (evento) {
+    evento.preventDefault();
+    const datos = new FormData(this);
+    const url = ES_EDICION ? '/api/viajes/' + PK + '/' : '/api/viajes/';
+    const metodo = ES_EDICION ? 'PATCH' : 'POST';
+
+    try {
+      const respuesta = await apiFetch(url, { method: metodo, body: datos });
+      const viaje = await obtenerDatos(respuesta);
+      mostrarAlerta('form-alertas', ES_EDICION ? 'Viaje actualizado correctamente.' : 'Viaje publicado correctamente.', 'success');
+      setTimeout(function () { window.location.href = '/viajes/' + viaje.id + '/'; }, 900);
+    } catch (error) {
+      const mensajes = error.data ? erroresValidacion(error.data) : [error.message];
+      mostrarAlerta('form-alertas', mensajes.join('<br>'), 'danger');
+    }
+  });
+</script>
+{% endblock %}

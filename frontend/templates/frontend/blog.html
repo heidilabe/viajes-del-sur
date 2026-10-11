@@ -1,0 +1,103 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Blog de Viajes{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">Últimos viajes</h1>
+  <a href="{% url 'crear_viaje' %}" class="btn btn-success">
+    <i class="bi bi-plus-circle"></i> Nuevo viaje
+  </a>
+</div>
+
+<div id="blog-alertas"></div>
+
+<div id="lista-viajes" class="row g-4">
+  <div class="col-12 text-center text-muted py-5">
+    <div class="spinner-border text-primary" role="status"></div>
+    <p class="mt-2">Cargando viajes…</p>
+  </div>
+</div>
+
+<template id="tarjeta-viaje">
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100 shadow-sm">
+      <img class="card-img-top" src="" alt="Foto del viaje">
+      <div class="card-body d-flex flex-column">
+        <h2 class="h5 card-title"></h2>
+        <p class="text-muted small mb-1 lugar"></p>
+        <p class="mb-1 autor"></p>
+        <p class="mb-2 fecha small text-secondary"></p>
+        <p class="estrellas mb-3"></p>
+        <a class="btn btn-outline-primary mt-auto leer-mas" href="#">Leer más</a>
+        <div class="mt-2">
+          <a class="btn btn-sm btn-outline-secondary editar" href="#" title="Editar"><i class="bi bi-pencil"></i></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const PLACEHOLDER_FOTO = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400">' +
+    '<rect width="100%" height="100%" fill="#dee2e6"/>' +
+    '<text x="50%" y="50%" font-family="sans-serif" font-size="28" fill="#6c757d" text-anchor="middle">Sin foto</text></svg>'
+  );
+
+  function estrellas(calificacion) {
+    const total = Number(calificacion) || 0;
+    let salida = '';
+    for (let i = 1; i <= 5; i++) {
+      salida += i <= total ? '★' : '☆';
+    }
+    return salida;
+  }
+
+  async function cargarViajes() {
+    const contenedor = document.getElementById('lista-viajes');
+    try {
+      const respuesta = await apiFetch('/api/viajes/');
+      const viajes = await obtenerDatos(respuesta);
+
+      contenedor.innerHTML = '';
+
+      if (!viajes.length) {
+        contenedor.innerHTML = '<div class="col-12 text-center text-muted py-5">Aún no hay viajes publicados.</div>';
+        return;
+      }
+
+      const plantilla = document.getElementById('tarjeta-viaje');
+
+      viajes.forEach(function (viaje) {
+        const nodo = plantilla.content.cloneNode(true);
+        const tarjeta = nodo.querySelector('.card');
+        const imagen = nodo.querySelector('img');
+        imagen.src = viaje.foto || PLACEHOLDER_FOTO;
+        imagen.onerror = function () { this.src = PLACEHOLDER_FOTO; };
+        tarjeta.querySelector('.card-title').textContent = viaje.titulo;
+        tarjeta.querySelector('.lugar').innerHTML =
+          '<i class="bi bi-geo-alt"></i> ' +
+          (viaje.lugar_detalle ? viaje.lugar_detalle.nombre + ' (' + viaje.lugar_detalle.ciudad + ', ' + viaje.lugar_detalle.pais + ')' : 'Lugar no definido');
+        tarjeta.querySelector('.autor').innerHTML =
+          '<i class="bi bi-person"></i> ' +
+          (viaje.persona_detalle ? viaje.persona_detalle.nombre + ' ' + viaje.persona_detalle.apellido : 'Autor desconocido');
+        tarjeta.querySelector('.fecha').innerHTML =
+          '<i class="bi bi-calendar3"></i> Visitado el ' + viaje.fecha_visita;
+        tarjeta.querySelector('.estrellas').textContent = estrellas(viaje.calificacion);
+        tarjeta.querySelector('.leer-mas').setAttribute('href', '/viajes/' + viaje.id + '/');
+        tarjeta.querySelector('.editar').setAttribute('href', '/viajes/' + viaje.id + '/editar/');
+
+        contenedor.appendChild(nodo);
+      });
+    } catch (error) {
+      contenedor.innerHTML = '';
+      mostrarAlerta('blog-alertas', 'No fue posible cargar los viajes: ' + error.message, 'danger');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', cargarViajes);
+</script>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Lugares{% endblock %}
+
+{% block content %}
+<a href="{% url 'blog' %}" class="btn btn-sm btn-outline-secondary mb-3">
+  <i class="bi bi-arrow-left"></i> Volver al Blog
+</a>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">Lugares</h1>
+  <a href="{% url 'crear_lugar' %}" class="btn btn-success">
+    <i class="bi bi-plus-circle"></i> Agregar Lugar
+  </a>
+</div>
+
+<div id="lugares-alertas"></div>
+
+<div id="lista-lugares" class="row g-4">
+  <div class="col-12 text-center text-muted py-5">
+    <div class="spinner-border text-primary" role="status"></div>
+    <p class="mt-2">Cargando lugares…</p>
+  </div>
+</div>
+
+<template id="tarjeta-lugar">
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100 shadow-sm">
+      <img class="card-img-top" src="" alt="Foto del lugar">
+      <div class="card-body">
+        <h2 class="h5 card-title"></h2>
+        <p class="text-muted small mb-1 ubicacion"></p>
+        <p class="card-text descripcion"></p>
+        <span class="badge bg-success visitas"></span>
+        <div class="mt-3">
+          <a class="btn btn-sm btn-outline-secondary editar" href="#" title="Editar"><i class="bi bi-pencil"></i></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const LUGAR_SIN_FOTO = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400">' +
+    '<rect width="100%" height="100%" fill="#dee2e6"/>' +
+    '<text x="50%" y="50%" font-family="sans-serif" font-size="28" fill="#6c757d" text-anchor="middle">Sin foto</text></svg>'
+  );
+
+  async function cargarLugares() {
+    const contenedor = document.getElementById('lista-lugares');
+    try {
+      const respuesta = await apiFetch('/api/lugares/');
+      const lugares = await obtenerDatos(respuesta);
+
+      contenedor.innerHTML = '';
+
+      if (!lugares.length) {
+        contenedor.innerHTML = '<div class="col-12 text-center text-muted py-5">No hay lugares registrados.</div>';
+        return;
+      }
+
+      const plantilla = document.getElementById('tarjeta-lugar');
+
+      lugares.forEach(function (lugar) {
+        const nodo = plantilla.content.cloneNode(true);
+        const imagen = nodo.querySelector('img');
+        imagen.src = lugar.foto || LUGAR_SIN_FOTO;
+        imagen.onerror = function () { this.src = LUGAR_SIN_FOTO; };
+        nodo.querySelector('.card-title').textContent = lugar.nombre;
+        nodo.querySelector('.ubicacion').textContent = lugar.ciudad + ', ' + lugar.pais;
+        nodo.querySelector('.descripcion').textContent = lugar.descripcion;
+        nodo.querySelector('.visitas').textContent =
+          lugar.cantidad_visitas + ' visita' + (lugar.cantidad_visitas === 1 ? '' : 's') +
+          (lugar.promedio_calificacion !== null && lugar.promedio_calificacion !== undefined
+            ? ' · Promedio ' + lugar.promedio_calificacion + ' ★'
+            : '');
+        nodo.querySelector('.editar').setAttribute('href', '/lugares/' + lugar.id + '/editar/');
+        contenedor.appendChild(nodo);
+      });
+    } catch (error) {
+      contenedor.innerHTML = '';
+      mostrarAlerta('lugares-alertas', 'No fue posible cargar los lugares: ' + error.message, 'danger');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', cargarLugares);
+</script>
+{% endblock %}

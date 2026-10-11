@@ -1,0 +1,74 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <a href="{{ volver_url }}" class="btn btn-sm btn-outline-secondary mb-3">
+      <i class="bi bi-arrow-left"></i> {{ volver_texto }}
+    </a>
+    <div class="card shadow-sm">
+      <div class="card-header bg-danger text-white">
+        <h1 class="h5 mb-0"><i class="bi bi-trash"></i> {{ titulo }}</h1>
+      </div>
+      <div class="card-body">
+        <div id="confirmar-alertas"></div>
+        <p class="mb-1">¿Estás seguro de que deseas eliminar <strong id="objeto-nombre">…</strong>?</p>
+        <p class="text-muted small">Esta acción no se puede deshacer.</p>
+        <div class="d-flex gap-2 mt-3">
+          <button type="button" id="btn-confirmar" class="btn btn-danger">
+            <i class="bi bi-trash"></i> Sí, eliminar
+          </button>
+          <a href="{{ volver_url }}" class="btn btn-outline-secondary">Cancelar</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const API_URL = '{{ api_url|escapejs }}';
+  const VOLVER_URL = '{{ volver_url|escapejs }}';
+
+  function nombreObjeto(objeto) {
+    if (objeto.titulo) return objeto.titulo;
+    const nombreCompleto = ((objeto.nombre || '') + ' ' + (objeto.apellido || '')).trim();
+    return nombreCompleto || ('#' + objeto.id);
+  }
+
+  async function cargarObjeto() {
+    try {
+      const respuesta = await apiFetch(API_URL);
+      const objeto = await obtenerDatos(respuesta);
+      document.getElementById('objeto-nombre').textContent = nombreObjeto(objeto);
+    } catch (error) {
+      document.getElementById('objeto-nombre').textContent = 'el registro seleccionado';
+      mostrarAlerta('confirmar-alertas', 'No se pudo cargar el registro: ' + error.message, 'warning');
+    }
+  }
+
+  document.getElementById('btn-confirmar').addEventListener('click', async function () {
+    const boton = this;
+    boton.disabled = true;
+    try {
+      const respuesta = await apiFetch(API_URL, { method: 'DELETE' });
+      if (!respuesta.ok && respuesta.status !== 204) {
+        await obtenerDatos(respuesta);
+      }
+      window.location.href = VOLVER_URL;
+    } catch (error) {
+      boton.disabled = false;
+      const mensajes = error.data ? erroresValidacion(error.data) : [error.message];
+      mostrarAlerta('confirmar-alertas', mensajes.join('<br>'), 'danger');
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!requerirSesion()) return;
+    cargarObjeto();
+  });
+</script>
+{% endblock %}
